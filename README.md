@@ -1,12 +1,16 @@
-# crazy-dorm
-This is a mobile application developed for the "Ubiquitous Applications Technologies" course.
+# crazy_dorm
 
-## Technologies Used
-- **Frontend:** Android Studio with Java/Kotlin (or Flutter)
-- **Backend:** Spring Boot with JPA and MySQL
+A new Flutter project.
 
-## Setup Instructions
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/afroditiK/crazy-dorm.git
+## Getting Started
 
+This project is a starting point for a Flutter application.
+
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
