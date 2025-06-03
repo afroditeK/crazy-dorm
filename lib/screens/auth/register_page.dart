@@ -1,8 +1,12 @@
+import 'package:crazy_dorm/main.dart';
+import 'package:crazy_dorm/screens/home_screen.dart';
 import 'package:crazy_dorm/screens/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crazy_dorm/models/user_model.dart'; // Your UserModel class
+import 'package:crazy_dorm/theme/app_theme.dart';
+
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({Key? key}) : super(key: key);
@@ -106,7 +110,8 @@ class _RegisterPageState extends State<RegisterPage> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => ProfilePage(userId: uid, isSelf: true),
+            // builder: (_) => ProfilePage(userId: uid, isSelf: true),
+            builder: (_) => HomePage(),
           ),
         );
       }
@@ -142,7 +147,6 @@ class _RegisterPageState extends State<RegisterPage> {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.teal.shade50,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -153,7 +157,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Register'),
-        backgroundColor: Colors.teal.shade600,
+        // backgroundColor: Colors.teal.shade600,
       ),
       backgroundColor: Colors.grey[100],
       body: Center(
@@ -202,7 +206,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   decoration: InputDecoration(
                     labelText: 'Faculty',
                     filled: true,
-                    fillColor: Colors.teal.shade50,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   items: _faculties.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
@@ -215,7 +218,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   decoration: InputDecoration(
                     labelText: 'Nationality',
                     filled: true,
-                    fillColor: Colors.teal.shade50,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   items: _countries
@@ -234,7 +236,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     : ElevatedButton(
                         onPressed: _register,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.shade700,
                           minimumSize: const Size(double.infinity, 50),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),

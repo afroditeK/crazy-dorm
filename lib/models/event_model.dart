@@ -8,15 +8,21 @@ class Event {
   final String creatorId;
   final String creatorName;
   final Map<String, bool> rsvps;
-
+  final double? latitude;
+  final double? longitude;
+  final String location; 
+  
   Event({
     this.id,
     required this.title,
-    required this.description,
+    this.description = '',
     required this.date,
     required this.creatorId,
     required this.creatorName,
     required this.rsvps,
+    this.latitude,
+    this.longitude,
+    this.location = '',
   });
 
   factory Event.fromFirestore(DocumentSnapshot doc) {
@@ -31,6 +37,9 @@ class Event {
       rsvps: (data['rsvps'] != null) 
           ? Map<String, bool>.from(data['rsvps'] as Map) 
           : <String, bool>{},
+      latitude: (data['latitude'] != null) ? (data['latitude'] as num).toDouble() : null,
+      longitude: (data['longitude'] != null) ? (data['longitude'] as num).toDouble() : null,
+      location: data['location'] ?? '',
     );
   }
 
@@ -42,6 +51,9 @@ class Event {
       'creatorId': creatorId,
       'creatorName': creatorName,
       'rsvps': rsvps,
+      'latitude': latitude,
+      'longitude': longitude,
+      'location': location,
     };
   }
 
@@ -53,6 +65,9 @@ class Event {
     String? creatorId,
     String? creatorName,
     Map<String, bool>? rsvps,
+    double? latitude,
+    double? longitude,
+    String? location,
   }) {
     return Event(
       id: id ?? this.id,
@@ -62,6 +77,9 @@ class Event {
       creatorId: creatorId ?? this.creatorId,
       creatorName: creatorName ?? this.creatorName,
       rsvps: rsvps ?? this.rsvps,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      location: location ?? this.location,
     );
   }
 }

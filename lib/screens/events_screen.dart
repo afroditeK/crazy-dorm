@@ -3,13 +3,26 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/event_service.dart';
 import '../models/event_model.dart';
+import 'location_picker_page.dart';
+import 'package:crazy_dorm/theme/app_theme.dart';
 
+//todo add swipe to delete and find the creator name from uid
 class EventsPage extends StatefulWidget {
   const EventsPage({Key? key}) : super(key: key);
 
   @override
   _EventsPageState createState() => _EventsPageState();
 }
+
+final List<String> mariborPlaces = [
+  'Main Square (Glavni trg)',
+  'Maribor Castle',
+  'Lent',
+  'Pyramid Hill (Piramida)',
+  'Maribor Cathedral',
+  'City Park (Mestni park)',
+  "Nana's Bistro & Kavarna"
+];
 
 class _EventsPageState extends State<EventsPage> {
   late EventService _eventService;
@@ -25,9 +38,24 @@ class _EventsPageState extends State<EventsPage> {
   @override
   void initState() {
     super.initState();
-    userId = FirebaseAuth.instance.currentUser!.uid;
-    _eventService = EventService(userId);
-    _loadUserName();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      userId = '';
+    } else {
+      userId = user.uid;
+      _eventService = EventService(userId);
+      _loadUserName();
+    }
+
+    _searchController.addListener(() {
+      _filterEvents(_searchController.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserName() async {
@@ -36,6 +64,10 @@ class _EventsPageState extends State<EventsPage> {
       if (doc.exists) {
         setState(() {
           userName = doc.data()?['username'] ?? 'Unknown';
+          isLoadingUserName = false;
+        });
+      } else {
+        setState(() {
           isLoadingUserName = false;
         });
       }
@@ -48,15 +80,20 @@ class _EventsPageState extends State<EventsPage> {
 
   void _filterEvents(String query) {
     setState(() {
-      _filteredEvents = _allEvents
-          .where((event) => event.title.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      if (query.isEmpty) {
+        _filteredEvents = List.from(_allEvents);
+      } else {
+        _filteredEvents = _allEvents
+            .where((event) => event.title.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
     });
   }
 
   Future<void> _showAddEditDialog({Event? eventToEdit}) async {
     final titleController = TextEditingController(text: eventToEdit?.title ?? '');
     final descriptionController = TextEditingController(text: eventToEdit?.description ?? '');
+    String? selectedLocation = eventToEdit?.location.isNotEmpty == true ? eventToEdit!.location : null;
     DateTime? selectedDate = eventToEdit?.date;
 
     await showDialog(
@@ -85,13 +122,29 @@ class _EventsPageState extends State<EventsPage> {
               children: [
                 TextField(
                   controller: titleController,
-                  decoration: InputDecoration(labelText: 'Title'),
+                  decoration: const InputDecoration(labelText: 'Title'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: descriptionController,
                   maxLines: 2,
-                  decoration: InputDecoration(labelText: 'Description'),
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Location'),
+                  value: selectedLocation,
+                  items: mariborPlaces
+                      .map((place) => DropdownMenuItem(
+                            value: place,
+                            child: Text(place),
+                          ))
+                      .toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      selectedLocation = val;
+                    });
+                  },
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -122,18 +175,19 @@ class _EventsPageState extends State<EventsPage> {
               onPressed: () async {
                 final title = titleController.text.trim();
                 final description = descriptionController.text.trim();
-                if (title.isEmpty || description.isEmpty || selectedDate == null || isLoadingUserName) {
+                final location = selectedLocation?.trim() ?? '';
+                if (title.isEmpty || description.isEmpty || selectedDate == null || isLoadingUserName || location.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Fill all fields and wait for user data.')),
+                    const SnackBar(content: Text('Please fill all fields and wait for user data.')),
                   );
                   return;
                 }
 
                 if (eventToEdit == null) {
-                  // Add new event
                   final newEvent = Event(
                     title: title,
                     description: description,
+                    location: location,
                     date: selectedDate!,
                     creatorId: userId,
                     creatorName: userName,
@@ -144,10 +198,10 @@ class _EventsPageState extends State<EventsPage> {
                     const SnackBar(content: Text('Event added')),
                   );
                 } else {
-                  // Update existing event
                   final updatedEvent = eventToEdit.copyWith(
                     title: title,
                     description: description,
+                    location: location,
                     date: selectedDate!,
                   );
                   await _eventService.updateEvent(updatedEvent);
@@ -166,19 +220,34 @@ class _EventsPageState extends State<EventsPage> {
     );
   }
 
-  void _deleteEvent(String id) async {
+  Future<void> _deleteEvent(String id) async {
     await _eventService.deleteEvent(id);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Event deleted')),
     );
   }
 
-  void _updateRSVP(String eventId, bool going) async {
-    await _eventService.updateRSVP(eventId, going);
+  Future<void> _updateRSVP(String eventId, bool going) async {
+    final currentEvent = _allEvents.firstWhere((e) => e.id == eventId);
+    final currentRsvp = currentEvent.rsvps[userId];
+
+    if (currentRsvp == going) {
+      // Cancel RSVP
+      await _eventService.updateRSVP(eventId, !going);
+    } else {
+      await _eventService.updateRSVP(eventId, going);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (userId.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Events')),
+        body: const Center(child: Text('Please log in to see events')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Events'),
@@ -193,7 +262,6 @@ class _EventsPageState extends State<EventsPage> {
               children: [
                 TextField(
                   controller: _searchController,
-                  onChanged: _filterEvents,
                   decoration: InputDecoration(
                     labelText: 'Search Events',
                     prefixIcon: const Icon(Icons.search),
@@ -226,73 +294,185 @@ class _EventsPageState extends State<EventsPage> {
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
+
                 _allEvents = snapshot.data ?? [];
                 _filteredEvents = _searchController.text.isEmpty
-                    ? _allEvents
+                    ? List.from(_allEvents)
                     : _allEvents
                         .where((e) => e.title.toLowerCase().contains(_searchController.text.toLowerCase()))
                         .toList();
 
                 if (_filteredEvents.isEmpty) {
-                  return const Center(child: Text('No events found'));
+                  return const Center(child: Text('No events found.'));
                 }
 
                 return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: _filteredEvents.length,
-                  itemBuilder: (context, index) {
+                  itemBuilder: (ctx, index) {
                     final event = _filteredEvents[index];
-                    final userRsvp = event.rsvps[userId];
-                    final yesCount = event.rsvps.values.where((r) => r == true).length;
-                    final noCount = event.rsvps.values.where((r) => r == false).length;
+                    final rsvps = event.rsvps;
+                    final goingCount = rsvps.values.where((v) => v == true).length;
+                    final notGoingCount = rsvps.values.where((v) => v == false).length;
+                    final userRsvp = rsvps[userId];
 
-                    return Dismissible(
-                      key: Key(event.id ?? event.title + index.toString()),
-                      direction: event.creatorId == userId
-                          ? DismissDirection.endToStart
-                          : DismissDirection.none,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        color: Colors.red,
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      onDismissed: (_) => _deleteEvent(event.id!),
-                      child: Card(
-                        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                        child: ListTile(
-                          onTap: event.creatorId == userId
-                              ? () => _showAddEditDialog(eventToEdit: event)
-                              : null,
-                          title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${event.description}\nDate: ${event.date.toLocal().toString().split(' ')[0]}'),
-                              Text('Planned by: ${event.creatorName}',
-                                  style: const TextStyle(fontStyle: FontStyle.italic)),
-                              const SizedBox(height: 5),
-                              Row(
-                                children: [
-                                  const Text('RSVP: '),
-                                  ChoiceChip(
-                                    label: const Text('Yes'),
-                                    selected: userRsvp == true,
-                                    onSelected: (val) => _updateRSVP(event.id!, true),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Title and date
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    event.title,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  ChoiceChip(
-                                    label: const Text('No'),
-                                    selected: userRsvp == false,
-                                    onSelected: (val) => _updateRSVP(event.id!, false),
+                                ),
+                                Text(
+                                  event.date.toLocal().toString().split(' ')[0],
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  const SizedBox(width: 16),
-                                  Text('Yes: $yesCount'),
-                                  const SizedBox(width: 8),
-                                  Text('No: $noCount'),
-                                ],
-                              )
-                            ],
-                          ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+
+                            // Description
+                            Text(
+                              event.description,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Location
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on, size: 18, color: Colors.deepPurple),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    event.location,
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => LocationPage(location: event.location),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.map_outlined),
+                                  label: const Text('View Map', style: TextStyle(
+                                    color: Colors.black,
+                                  ),
+                              ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepPurple.shade100,
+                                    minimumSize: const Size(110, 30),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Created by
+                            Text(
+                              
+                              'Planned by: ${event.creatorName}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+
+                            // RSVP buttons and counts
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Going button
+                                Tooltip(
+                                  message: 'RSVP Going',
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: userRsvp == true ? Colors.green.shade600 : Colors.grey.shade300,
+                                      foregroundColor: userRsvp == true ? Colors.white : Colors.black87,
+                                    ),
+                                    icon: const Icon(Icons.check),
+                                    label: Text('Yes ($goingCount)'),
+                                    onPressed: () => _updateRSVP(event.id ?? 'No location provided', true),
+                                  ),
+                                ),
+
+                                // Not Going button
+                                Tooltip(
+                                  message: 'RSVP Not Going',
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: userRsvp == false ? Colors.red.shade600 : Colors.grey.shade300,
+                                      foregroundColor: userRsvp == false ? Colors.white : Colors.black87,
+                                    ),
+                                    icon: const Icon(Icons.close),
+                                    label: Text('No ($notGoingCount)'),
+                                    onPressed: () => _updateRSVP(event.id ?? 'No location provided', false),
+                                  ),
+                                ),
+
+                                // Edit button (only creator)
+                                if (event.creatorId == userId)
+                                  IconButton(
+                                    tooltip: 'Edit Event',
+                                    icon: const Icon(Icons.edit, color: Colors.deepPurple),
+                                    onPressed: () => _showAddEditDialog(eventToEdit: event),
+                                  ),
+
+                                // Delete button (only creator)
+                                if (event.creatorId == userId)
+                                  IconButton(
+                                    tooltip: 'Delete Event',
+                                    icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                    onPressed: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text('Delete Event'),
+                                          content: const Text('Are you sure you want to delete this event?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.of(ctx).pop(false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () => Navigator.of(ctx).pop(true),
+                                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirm == true) {
+                                        _deleteEvent(event.id ?? 'No location provided');
+                                      }
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -300,7 +480,7 @@ class _EventsPageState extends State<EventsPage> {
                 );
               },
             ),
-          )
+          ),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crazy_dorm/models/user_model.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:crazy_dorm/theme/app_theme.dart';
 
 class ProfilePage extends StatefulWidget {
   final String userId;
@@ -425,7 +426,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               icon: const Icon(Icons.qr_code),
                               label: const Text('Show My QR Code'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.deepPurple.shade50,
+                                // backgroundColor: Colors.deepPurple.shade50,
                                 minimumSize: const Size(double.infinity, 50),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(15)),

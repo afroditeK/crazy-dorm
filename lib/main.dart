@@ -5,7 +5,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'screens/auth/sign_in_page.dart';  // Your login page file
 import 'screens/home_screen.dart';   // Your home page file
-// import 'theme/app_theme.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Crazy Dorm',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.light(),
+      theme: AppTheme.lightTheme,
       darkTheme: ThemeData.dark(),
       home: const AuthGate(),
     );

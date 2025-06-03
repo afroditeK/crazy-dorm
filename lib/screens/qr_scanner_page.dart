@@ -19,12 +19,14 @@ class _QrScannerPageState extends State<QrScannerPage> {
       body: MobileScanner(
         onDetect: (barcodeCapture) {
           if (!_scanned) {
-            final List<Barcode> barcodes = barcodeCapture.barcodes;
+            final barcodes = barcodeCapture.barcodes;
             if (barcodes.isNotEmpty) {
               final barcode = barcodes.first;
-              if (barcode.rawValue != null) {
-                _scanned = true;
-                final userId = barcode.rawValue!;
+              final userId = barcode.rawValue;
+              if (userId != null) {
+                setState(() {
+                  _scanned = true;
+                });
                 widget.onUserIdScanned(userId);
                 Navigator.pop(context);
               }

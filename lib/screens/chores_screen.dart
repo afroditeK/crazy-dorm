@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
+import 'package:crazy_dorm/theme/app_theme.dart';
+
+//todo add the name
 
 class ChoresScreen extends StatefulWidget {
   final String currentUser;
