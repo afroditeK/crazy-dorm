@@ -1,10 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:crazy_dorm/services/friend_service.dart';  // your service to handle friend requests
+import 'package:crazy_dorm/services/friend_service.dart';
 import 'friend_profile_page.dart';
 import 'friend_qr_page.dart';
-import 'package:crazy_dorm/theme/app_theme.dart';
 
 class FriendsPage extends StatefulWidget {
   const FriendsPage({super.key});
@@ -12,6 +11,7 @@ class FriendsPage extends StatefulWidget {
   @override
   State<FriendsPage> createState() => _FriendsPageState();
 }
+
 
 class _FriendsPageState extends State<FriendsPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -34,15 +34,15 @@ class _FriendsPageState extends State<FriendsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Friends'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await _auth.signOut();
-              Navigator.of(context).pushReplacementNamed('/login');
-            },
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.logout),
+        //     onPressed: () async {
+        //       await _auth.signOut();
+        //       Navigator.of(context).pushReplacementNamed('/login');
+        //     },
+        //   ),
+        // ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -67,9 +67,11 @@ class _FriendsPageState extends State<FriendsPage> {
 
           final List<dynamic> friendsRaw = data['friends'] ?? [];
           final List<dynamic> requestsRaw = data['friendRequestsReceived'] ?? [];
+          final List<dynamic> sentRequestsRaw = data['friendRequestsSent'] ?? [];
 
           final List<String> friendIds = List<String>.from(friendsRaw);
           final List<String> requestIds = List<String>.from(requestsRaw);
+          final List<String> sentRequestIds = List<String>.from(sentRequestsRaw);
 
           return ListView(
             padding: const EdgeInsets.all(8),
@@ -161,6 +163,64 @@ class _FriendsPageState extends State<FriendsPage> {
                     );
                   },
                 ),
+              const Divider(),
+              const ListTile(
+                title: Text('Discover People', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              StreamBuilder<QuerySnapshot>(
+                stream: _firestore.collection('users').snapshots(),
+                builder: (context, usersSnapshot) {
+                  if (usersSnapshot.hasError) {
+                    return const ListTile(title: Text('Error loading users.'));
+                  }
+                  if (!usersSnapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final allUsers = usersSnapshot.data!.docs;
+                  final discoverableUsers = allUsers.where((doc) {
+                    final id = doc.id;
+                    return id != currentUserId &&
+                        !friendIds.contains(id) &&
+                        !requestIds.contains(id) &&
+                        !sentRequestIds.contains(id);
+                  }).toList();
+
+                  if (discoverableUsers.isEmpty) {
+                    return const ListTile(title: Text('No new users to discover.'));
+                  }
+
+                  return Column(
+                    children: discoverableUsers.map((userDoc) {
+                      final user = userDoc.data() as Map<String, dynamic>;
+                      final userId = userDoc.id;
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: user['photoURL'] != null && user['photoURL'].toString().isNotEmpty
+                              ? NetworkImage(user['photoURL'])
+                              : null,
+                          child: (user['photoURL'] == null || user['photoURL'].toString().isEmpty)
+                              ? Text((user['name'] ?? 'U').toString()[0].toUpperCase())
+                              : null,
+                        ),
+                        title: Text(user['name'] ?? 'Unknown'),
+                        subtitle: Text(user['email'] ?? ''),
+                        trailing: ElevatedButton(
+                          onPressed: () async {
+                            await _friendService.sendFriendRequest(userId);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Friend request sent to ${user['name']}')),
+                              );
+                            }
+                          },
+                          child: const Text('Add Friend'),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
             ],
           );
         },

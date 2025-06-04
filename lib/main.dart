@@ -26,7 +26,8 @@ class MyApp extends StatelessWidget {
       title: 'Crazy Dorm',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      darkTheme: ThemeData.dark(),
+      darkTheme: AppTheme.lightTheme,
+      themeMode: ThemeMode.system,
       home: const AuthGate(),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:crazy_dorm/main.dart';
+import 'package:crazy_dorm/screens/chores_screen.dart';
 import 'package:crazy_dorm/screens/home_screen.dart';
 import 'package:crazy_dorm/screens/profile_page.dart';
 import 'package:flutter/material.dart';
@@ -106,13 +107,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
       await FirebaseFirestore.instance.collection('users').doc(uid).set(newUser.toMap());
 
-      // Navigate to ProfilePage (assuming routing by userId)
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            // builder: (_) => ProfilePage(userId: uid, isSelf: true),
-            builder: (_) => HomePage(),
-          ),
+        Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {

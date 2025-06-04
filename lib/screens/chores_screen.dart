@@ -1,384 +1,349 @@
+// ignore_for_file: use_build_context_synchronously
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/task_model.dart';
-import '../services/task_service.dart';
-import 'package:crazy_dorm/theme/app_theme.dart';
-
-//todo add the name
 
 class ChoresScreen extends StatefulWidget {
-  final String currentUser;
-  final Function(int)? onCountUpdated;
-  final List<Map<String, String>> friends;
+  final String userEmail;
+  final List<String> friendsEmails;
 
   const ChoresScreen({
-    Key? key,
-    required this.currentUser,
-    required this.friends,
-    this.onCountUpdated,
-  }) : super(key: key);
+    super.key,
+    required this.userEmail,
+    required this.friendsEmails,
+  });
 
   @override
-  _ChoresScreenState createState() => _ChoresScreenState();
+  State<ChoresScreen> createState() => _ChoresScreenState();
 }
 
 class _ChoresScreenState extends State<ChoresScreen> {
-  final TaskService taskService = TaskService();
-  late List<String> users;
-  late Map<String, String> nameMap; // Mapping real names to display names
+  final TextEditingController _taskController = TextEditingController();
+  String? _selectedAssignee;
+  String? _editingTaskId;
+
+  final List<String> _predefinedChores = [
+    'Wash dishes',
+    'Clean bathroom',
+    'Vacuum floor',
+    'Take out trash',
+  ];
 
   @override
   void initState() {
     super.initState();
-    users = [widget.currentUser, ...widget.friends.map((f) => f['name']!)];
-    nameMap = {
-      widget.currentUser: 'Me',
-      ...{for (var f in widget.friends) f['name']!: f['name']!}
-    };
+    _selectedAssignee = widget.userEmail;
   }
 
-  void _showAddTaskDialog() {
-    final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
-    DateTime? selectedDate;
-    String assignedTo = widget.currentUser;
+  @override
+  void dispose() {
+    _taskController.dispose();
+    super.dispose();
+  }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text("Add New Task", style: TextStyle(fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    labelText: "Title",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: "Description",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: assignedTo,
-                  items: users.map((user) => DropdownMenuItem(
-                    value: user,
-                    child: Text(nameMap[user]!),
-                  )).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        assignedTo = val;
-                      });
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Assign To',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  label: Text(selectedDate == null
-                      ? 'Pick Due Date'
-                      : 'Due: ${DateFormat.yMMMd().format(selectedDate!)}'),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate ?? DateTime.now(),
-                      firstDate: DateTime(2024),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        selectedDate = picked;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Cancel", style: TextStyle(color: Colors.black)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (titleController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter a title")),
-                  );
-                  return;
-                }
-                final newTask = Task(
-                  id: '',
-                  title: titleController.text.trim(),
-                  description: descriptionController.text.trim(),
-                  dueDate: selectedDate,
-                  assignedTo: assignedTo,
-                );
-                taskService.addTask(newTask);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Task '${newTask.title}' added for ${nameMap[assignedTo]}"),
-                    backgroundColor: Colors.green.shade600,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text("Add", style: TextStyle(color: Colors.white)),
-            ),
-          ],
+  Future<void> _addOrUpdateTask() async {
+    final taskText = _taskController.text.trim();
+    if (taskText.isEmpty || _selectedAssignee == null) return;
+
+    final choresRef = FirebaseFirestore.instance.collection('chores');
+
+    try {
+      if (_editingTaskId == null) {
+        await choresRef.add({
+          'text': taskText,
+          'assignedTo': _selectedAssignee,
+          'doneBy': [],
+          'createdAt': Timestamp.now(),
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task added!')),
+        );
+      } else {
+        await choresRef.doc(_editingTaskId).update({
+          'text': taskText,
+          'assignedTo': _selectedAssignee,
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task updated!')),
+        );
+        _editingTaskId = null;
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+
+    _taskController.clear();
+    setState(() {
+      _selectedAssignee = widget.userEmail;
+      _editingTaskId = null;
+    });
+  }
+
+  Future<void> _toggleDone(DocumentSnapshot taskDoc, bool isDoneNow) async {
+    final taskRef = FirebaseFirestore.instance.collection('chores').doc(taskDoc.id);
+    final List<dynamic> doneBy = List.from(taskDoc['doneBy'] ?? []);
+    final user = widget.userEmail;
+    final task = taskDoc.data() as Map<String, dynamic>;
+    final assignedTo = task['assignedTo'] as String? ?? '';
+
+    if (assignedTo != user) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can only mark as done/undone your own tasks.')),
+      );
+      return;
+    }
+
+    if (isDoneNow) {
+      if (!doneBy.contains(user)) {
+        doneBy.add(user);
+      }
+    } else {
+      doneBy.remove(user);
+    }
+
+    await taskRef.update({'doneBy': doneBy});
+    setState(() {});
+  }
+
+  Future<void> _deleteTask(DocumentSnapshot taskDoc) async {
+  try {
+    await FirebaseFirestore.instance.collection('chores').doc(taskDoc.id).delete();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Task deleted!')),
+    );
+
+    // Clear editing input and assignee after deleting
+    _taskController.clear();
+    setState(() {
+      _selectedAssignee = widget.userEmail;
+      _editingTaskId = null;
+    });
+
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error deleting task: $e')),
+    );
+  }
+}
+
+  Future<void> _confirmDeleteTask(DocumentSnapshot taskDoc) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete Task'),
+      content: const Text('Are you sure you want to delete this task?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
         ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirm == true) {
+    await _deleteTask(taskDoc);
+  }
+}
+
+
+  Widget _buildTaskItem(DocumentSnapshot taskDoc) {
+    final task = taskDoc.data() as Map<String, dynamic>;
+    final assignedTo = task['assignedTo'] as String? ?? '';
+    final doneBy = List<String>.from(task['doneBy'] ?? []);
+    final isDone = doneBy.contains(widget.userEmail);
+    final createdAt = task['createdAt'] as Timestamp?;
+    final createdDate = createdAt?.toDate();
+
+    final assignableUsers = [widget.userEmail, ...widget.friendsEmails].toSet().toList();
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: Checkbox(
+          value: isDone,
+          onChanged: (val) {
+            if (val != null) _toggleDone(taskDoc, val);
+          },
+        ),
+        title: Text(
+          task['text'] ?? '',
+          style: TextStyle(
+            decoration: isDone ? TextDecoration.lineThrough : null,
+            fontWeight: isDone ? FontWeight.w600 : FontWeight.normal,
+            fontSize: 18,
+          ),
+        ),
+        subtitle: Text(
+          'Assigned to: ${assignedTo.split('@')[0]}'
+          '${createdDate != null ? ' • ${DateFormat('dd/MM/yyyy').format(createdDate)}' : ''}',
+          style: TextStyle(color: Colors.grey[700]),
+        ),
+        trailing: IconButton(
+        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+        onPressed: () => _confirmDeleteTask(taskDoc),
+        tooltip: 'Delete task',
+        ),
+        onTap: () {
+          setState(() {
+            _editingTaskId = taskDoc.id;
+            _taskController.text = task['text'] ?? '';
+            if (assignableUsers.contains(assignedTo)) {
+              _selectedAssignee = assignedTo;
+            } else {
+              _selectedAssignee = widget.userEmail;
+            }
+          });
+        },
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("🧹 Chores"),
-        centerTitle: true,
-        actions: [
-          StreamBuilder<List<Task>>(
-            stream: taskService.getTasks(),
-            builder: (context, snapshot) {
-              int assignedCount = 0;
-              if (snapshot.hasData) {
-                assignedCount = snapshot.data!
-                    .where((task) =>
-                        task.assignedTo == widget.currentUser && !task.isCompleted)
-                    .length;
-              }
-              return Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.task_alt_outlined, size: 28),
-                    tooltip: "Your Assigned Tasks",
-                    onPressed: () {},
-                  ),
-                  if (assignedCount > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 20,
-                          minHeight: 20,
-                        ),
-                        child: Text(
-                          assignedCount.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline, size: 28),
-            tooltip: "Add New Task",
-            onPressed: _showAddTaskDialog,
-          ),
-        ],
-      ),
-      body: StreamBuilder<List<Task>>(
-        stream: taskService.getTasks(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text("Error loading tasks: ${snapshot.error}"));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final tasks = snapshot.data!;
-          if (tasks.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.cleaning_services_outlined, size: 64, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text("No tasks available",
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            itemCount: tasks.length,
-            itemBuilder: (context, index) {
-              final task = tasks[index];
-
-              return Dismissible(
-                key: Key(task.id),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  alignment: Alignment.centerRight,
-                  decoration: BoxDecoration(
-                    color: task.isCompleted ? Colors.redAccent : Colors.grey,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    task.isCompleted ? Icons.delete_forever : Icons.block,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                ),
-                confirmDismiss: (direction) async {
-                  if (!task.isCompleted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("You can only delete completed tasks."),
-                        backgroundColor: Colors.redAccent,
-                      ),
-                    );
-                    return false;
-                  }
-                  return true;
-                },
-                onDismissed: (_) {
-                  taskService.deleteTask(task.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Deleted task: ${task.title}"),
-                      backgroundColor: Colors.red.shade700,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-                child: Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    leading: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (child, animation) =>
-                          ScaleTransition(scale: animation, child: child),
-                      child: Icon(
-                        task.isCompleted
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        key: ValueKey<bool>(task.isCompleted),
-                        color:
-                            task.isCompleted ? Colors.green : Colors.grey.shade500,
-                        size: 30,
-                      ),
-                    ),
-                    title: Text(
-                      task.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        decoration:
-                            task.isCompleted ? TextDecoration.lineThrough : null,
-                        color: task.isCompleted ? Colors.grey : Colors.black87,
-                        fontSize: 17,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (task.description != null &&
-                            task.description!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              task.description!,
-                              style: TextStyle(
-                                color:
-                                    task.isCompleted ? Colors.grey : Colors.black54,
-                              ),
-                            ),
-                          ),
-                        if (task.dueDate != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              "Due: ${DateFormat.yMMMd().format(task.dueDate!)}",
-                              style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                color: task.isCompleted
-                                    ? Colors.grey
-                                    : Colors.black54,
-                              ),
-                            ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            "Assigned to: ${nameMap[task.assignedTo] ?? task.assignedTo}",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: task.isCompleted
-                                  ? Colors.grey
-                                  : Colors.blueAccent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: Checkbox(
-                      activeColor: Colors.deepPurple,
-                      value: task.isCompleted,
-                      onChanged: (val) {
-                        taskService.toggleTaskCompletion(task);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(val == true
-                                ? "Marked '${task.title}' as completed"
-                                : "Marked '${task.title}' as incomplete"),
-                            duration: const Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              );
+  Widget _buildPredefinedChores() {
+    return SizedBox(
+      height: 60,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: _predefinedChores.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 15),
+        itemBuilder: (_, i) {
+          final chore = _predefinedChores[i];
+          return ActionChip(
+            label: Text(chore, style: const TextStyle(fontSize: 14)),
+            onPressed: () {
+              setState(() {
+                _taskController.text = chore;
+              });
             },
           );
         },
+      ),
+    );
+  }
+
+  Stream<QuerySnapshot> _taskStream() {
+    return FirebaseFirestore.instance
+        .collection('chores')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assignableUsers = [widget.userEmail, ...widget.friendsEmails].toSet().toList();
+
+    final isAddUpdateEnabled =
+        _taskController.text.trim().isNotEmpty && _selectedAssignee != null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chores'),
+      ),
+      body: Column(
+        children: [
+          _buildPredefinedChores(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: TextField(
+              controller: _taskController,
+              decoration: const InputDecoration(
+                labelText: 'New chore',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) {
+                if (isAddUpdateEnabled) _addOrUpdateTask();
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedAssignee,
+                    decoration: const InputDecoration(labelText: 'Assign to'),
+                    items: assignableUsers.map((email) {
+                      return DropdownMenuItem<String>(
+                        value: email,
+                        child: Text(email.split('@')[0]),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedAssignee = val),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: isAddUpdateEnabled ? _addOrUpdateTask : null,
+                  child: Text(_editingTaskId == null ? 'Add' : 'Update'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _taskStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final tasks = snapshot.data!.docs;
+
+                final userTasksCount = tasks
+                    .where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return data['assignedTo'] == widget.userEmail;
+                    })
+                    .length;
+
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'You have $userTasksCount chores assigned',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _taskStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final tasks = snapshot.data!.docs;
+
+                if (tasks.isEmpty) {
+                  return const Center(child: Text('No chores yet.'));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  itemCount: tasks.length,
+                  itemBuilder: (_, i) => _buildTaskItem(tasks[i]),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

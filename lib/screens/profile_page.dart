@@ -194,7 +194,7 @@ class _ProfilePageState extends State<ProfilePage> {
               icon: const Icon(Icons.close),
               label: const Text('Close'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple.shade50,
+                // backgroundColor: Colors.deepPurple.shade50,
                 minimumSize: const Size(double.infinity, 45),
               ),
             ),
@@ -426,7 +426,6 @@ class _ProfilePageState extends State<ProfilePage> {
                               icon: const Icon(Icons.qr_code),
                               label: const Text('Show My QR Code'),
                               style: ElevatedButton.styleFrom(
-                                // backgroundColor: Colors.deepPurple.shade50,
                                 minimumSize: const Size(double.infinity, 50),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(15)),

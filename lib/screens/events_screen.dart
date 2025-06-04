@@ -1,12 +1,13 @@
+// events_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/event_service.dart';
 import '../models/event_model.dart';
 import 'location_picker_page.dart';
-import 'package:crazy_dorm/theme/app_theme.dart';
+import 'live_location_page.dart';
 
-//todo add swipe to delete and find the creator name from uid
 class EventsPage extends StatefulWidget {
   const EventsPage({Key? key}) : super(key: key);
 
@@ -17,7 +18,6 @@ class EventsPage extends StatefulWidget {
 final List<String> mariborPlaces = [
   'Main Square (Glavni trg)',
   'Maribor Castle',
-  'Lent',
   'Pyramid Hill (Piramida)',
   'Maribor Cathedral',
   'City Park (Mestni park)',
@@ -176,9 +176,9 @@ class _EventsPageState extends State<EventsPage> {
                 final title = titleController.text.trim();
                 final description = descriptionController.text.trim();
                 final location = selectedLocation?.trim() ?? '';
-                if (title.isEmpty || description.isEmpty || selectedDate == null || isLoadingUserName || location.isEmpty) {
+                if (title.isEmpty || selectedDate == null || isLoadingUserName || location.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please fill all fields and wait for user data.')),
+                    const SnackBar(content: Text('Please fill the title, date and location fields.')),
                   );
                   return;
                 }
@@ -232,7 +232,6 @@ class _EventsPageState extends State<EventsPage> {
     final currentRsvp = currentEvent.rsvps[userId];
 
     if (currentRsvp == going) {
-      // Cancel RSVP
       await _eventService.updateRSVP(eventId, !going);
     } else {
       await _eventService.updateRSVP(eventId, going);
@@ -316,163 +315,122 @@ class _EventsPageState extends State<EventsPage> {
                     final notGoingCount = rsvps.values.where((v) => v == false).length;
                     final userRsvp = rsvps[userId];
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Title and date
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    return Dismissible(
+                      key: Key(event.id ?? index.toString()),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (direction) async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete Event'),
+                            content: const Text('Are you sure you want to delete this event?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                        return confirm == true;
+                      },
+                      onDismissed: (_) {
+                        _deleteEvent(event.id ?? '');
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        color: Colors.red,
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      child: GestureDetector(
+                        onTap: () => _showAddEditDialog(eventToEdit: event),
+                        child: Card(
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    event.title,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  event.date.toLocal().toString().split(' ')[0],
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-
-                            // Description
-                            Text(
-                              event.description,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Location
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 18, color: Colors.deepPurple),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    event.location,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => LocationPage(location: event.location),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        event.title,
+                                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.map_outlined),
-                                  label: const Text('View Map', style: TextStyle(
-                                    color: Colors.black,
-                                  ),
-                              ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.deepPurple.shade100,
-                                    minimumSize: const Size(110, 30),
-                                  ),
+                                    ),
+                                    Text(
+                                      event.date.toLocal().toString().split(' ')[0],
+                                      style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(event.description, style: const TextStyle(fontSize: 16)),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on, size: 18, color: Colors.deepPurple),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(event.location, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => LocationPage(location: event.location),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.map_outlined),
+                                      label: const Text('View Map', style: TextStyle(fontSize: 14.0)),
+                                      style: ElevatedButton.styleFrom(minimumSize: const Size(110, 30)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: userRsvp == true ? Colors.green.shade600 : Colors.grey.shade300,
+                                        foregroundColor: userRsvp == true ? Colors.white : Colors.black87,
+                                      ),
+                                      icon: const Icon(Icons.check),
+                                      label: Text('Yes ($goingCount)', style: const TextStyle(fontSize: 14.0)),
+                                      onPressed: () => _updateRSVP(event.id ?? '', true),
+                                    ),
+                                    ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: userRsvp == false ? Colors.red.shade600 : Colors.grey.shade300,
+                                        foregroundColor: userRsvp == false ? Colors.white : Colors.black87,
+                                      ),
+                                      icon: const Icon(Icons.close),
+                                      label: Text('No ($notGoingCount)', style: const TextStyle(fontSize: 14.0)),
+                                      onPressed: () => _updateRSVP(event.id ?? '', false),
+                                    ),
+                                    if (event.creatorId == userId)
+                                      IconButton(
+                                        tooltip: 'Edit Event',
+                                        icon: const Icon(Icons.edit, color: Colors.deepPurple),
+                                        onPressed: () => _showAddEditDialog(eventToEdit: event),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
-
-                            // Created by
-                            Text(
-                              
-                              'Planned by: ${event.creatorName}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-
-                            // RSVP buttons and counts
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Going button
-                                Tooltip(
-                                  message: 'RSVP Going',
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: userRsvp == true ? Colors.green.shade600 : Colors.grey.shade300,
-                                      foregroundColor: userRsvp == true ? Colors.white : Colors.black87,
-                                    ),
-                                    icon: const Icon(Icons.check),
-                                    label: Text('Yes ($goingCount)'),
-                                    onPressed: () => _updateRSVP(event.id ?? 'No location provided', true),
-                                  ),
-                                ),
-
-                                // Not Going button
-                                Tooltip(
-                                  message: 'RSVP Not Going',
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: userRsvp == false ? Colors.red.shade600 : Colors.grey.shade300,
-                                      foregroundColor: userRsvp == false ? Colors.white : Colors.black87,
-                                    ),
-                                    icon: const Icon(Icons.close),
-                                    label: Text('No ($notGoingCount)'),
-                                    onPressed: () => _updateRSVP(event.id ?? 'No location provided', false),
-                                  ),
-                                ),
-
-                                // Edit button (only creator)
-                                if (event.creatorId == userId)
-                                  IconButton(
-                                    tooltip: 'Edit Event',
-                                    icon: const Icon(Icons.edit, color: Colors.deepPurple),
-                                    onPressed: () => _showAddEditDialog(eventToEdit: event),
-                                  ),
-
-                                // Delete button (only creator)
-                                if (event.creatorId == userId)
-                                  IconButton(
-                                    tooltip: 'Delete Event',
-                                    icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                    onPressed: () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text('Delete Event'),
-                                          content: const Text('Are you sure you want to delete this event?'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.of(ctx).pop(false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            TextButton(
-                                              onPressed: () => Navigator.of(ctx).pop(true),
-                                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (confirm == true) {
-                                        _deleteEvent(event.id ?? 'No location provided');
-                                      }
-                                    },
-                                  ),
-                              ],
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     );
@@ -483,6 +441,23 @@ class _EventsPageState extends State<EventsPage> {
           ),
         ],
       ),
-    );
+      floatingActionButton: FloatingActionButton.extended(
+      onPressed: () async {
+        final selectedLocation = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LiveLocationPage()),
+        );
+
+        if (selectedLocation != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Selected location: $selectedLocation')),
+          );
+        }
+      },
+      label: const Text('Show Live Location'),
+      icon: const Icon(Icons.map),
+    ),
+        );
   }
+
 }

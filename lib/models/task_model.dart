@@ -7,6 +7,9 @@ class Task {
   final DateTime? dueDate;
   final String assignedTo;
   final bool isCompleted;
+  final String createdBy;
+  final DateTime createdAt;
+
 
   Task({
     required this.id,
@@ -15,6 +18,8 @@ class Task {
     this.dueDate,
     required this.assignedTo,
     this.isCompleted = false,
+    required this.createdBy,
+    required this.createdAt,
   });
 
   // Factory to create a Task from Firestore document snapshot
@@ -28,6 +33,8 @@ class Task {
           data['dueDate'] != null ? (data['dueDate'] as Timestamp).toDate() : null,
       assignedTo: data['assignedTo'] ?? '',
       isCompleted: data['isCompleted'] ?? false,
+      createdBy: data['createdBy'] ?? '',
+      createdAt: data['createdAt'] ?? '',
     );
   }
 
@@ -39,6 +46,8 @@ class Task {
       'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
       'assignedTo': assignedTo,
       'isCompleted': isCompleted,
+      'createdBy': createdBy,
+      'createdAt': createdAt,
     };
   }
 }

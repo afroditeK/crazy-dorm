@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crazy_dorm/models/user_model.dart';
-import 'location_picker_page.dart';
+// import 'location_picker_page.dart';
+import 'package:crazy_dorm/theme/app_colors.dart';
+import 'package:crazy_dorm/theme/app_text_styles.dart';
 
 class FriendProfilePage extends StatefulWidget {
   final String userId;
@@ -72,11 +74,11 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.deepPurple.shade50,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.deepPurple.withOpacity(0.1),
+            color: AppColors.primary.withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -84,25 +86,17 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.deepPurple.shade700, size: 28),
+          Icon(icon, color: AppColors.primary, size: 28),
           const SizedBox(width: 18),
           Text(
             '$label:',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: Colors.deepPurple.shade900,
-            ),
+            style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.deepPurple.shade800,
-                fontWeight: FontWeight.w400,
-              ),
+              style: AppTextStyles.body,
             ),
           ),
         ],
@@ -118,14 +112,14 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [Colors.deepPurple.shade400, Colors.deepPurple.shade900],
+          colors: [AppColors.primary.withOpacity(0.7), AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.deepPurple.withOpacity(0.5),
-            blurRadius: 30,
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 15,
             spreadRadius: 5,
             offset: const Offset(0, 12),
           ),
@@ -145,10 +139,12 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator(color: Colors.deepPurple)),
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
@@ -156,17 +152,16 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Profile'),
-          backgroundColor: Colors.deepPurple,
         ),
-        body: const Center(child: Text('User not found', style: TextStyle(fontSize: 18))),
+        body: Center(
+          child: Text('User not found', style: theme.textTheme.bodyLarge),
+        ),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.deepPurple.shade50,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        elevation: 0,
         title: Text('${_user!.name}\'s Profile'),
       ),
       body: SafeArea(
@@ -178,48 +173,24 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
               const SizedBox(height: 28),
               Text(
                 _user!.name,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                  letterSpacing: 1.1,
-                ),
+                style: AppTextStyles.heading,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               Text(
                 _user!.description ?? 'No description provided.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.deepPurple.shade700,
-                  height: 1.3,
-                ),
+                style: AppTextStyles.body.copyWith(height: 1.3),
               ),
               const SizedBox(height: 36),
-
-              // Info tiles
               _infoTile(Icons.home, 'Room', _user!.room),
               _infoTile(Icons.phone, 'Phone', _user!.phone),
               _infoTile(Icons.school, 'Faculty', _user!.faculty),
               _infoTile(Icons.flag, 'Nationality', _user!.nationality),
-
               const SizedBox(height: 48),
             ],
           ),
         ),
-      ),
-
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('New feature coming soon!')),
-          );
-        },
-        label: const Text('New feature'),
-        icon: const Icon(Icons.map),
-        backgroundColor: Colors.deepPurple.shade50,
       ),
     );
   }

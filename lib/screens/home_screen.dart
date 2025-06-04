@@ -20,9 +20,10 @@ class _HomePageState extends State<HomePage> {
   bool _isTablet = false;
 
   String? userId;
+  String? userEmail;
   String? username;
   final ValueNotifier<int> _choreCountNotifier = ValueNotifier<int>(0);
-  List<Map<String, String>> friends = [];
+  List<String> friendsEmails = [];
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class _HomePageState extends State<HomePage> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       userId = currentUser.uid;
+      userEmail = currentUser.email;
       username = currentUser.displayName ?? 'Anonymous';
       loadFriends();
     }
@@ -39,32 +41,32 @@ class _HomePageState extends State<HomePage> {
     if (userId != null) {
       final loadedFriends = await getFriendsList(userId!);
       setState(() {
-        friends = loadedFriends;
+        // Include current user email + friends emails
+        friendsEmails = [if (userEmail != null) userEmail!, ...loadedFriends];
       });
     }
   }
 
-  Future<List<Map<String, String>>> getFriendsList(String userId) async {
+  Future<List<String>> getFriendsList(String userId) async {
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
 
     if (userDoc.exists) {
       final data = userDoc.data();
       if (data != null && data['friends'] != null) {
         List<String> friendIds = List<String>.from(data['friends']);
-        List<Map<String, String>> friendDetails = [];
+        List<String> friendEmails = [];
 
         for (String friendId in friendIds) {
           final friendDoc = await FirebaseFirestore.instance.collection('users').doc(friendId).get();
           if (friendDoc.exists) {
             final friendData = friendDoc.data();
-            if (friendData != null) {
-              final displayName = friendData['displayName'] ?? 'Unknown';
-              friendDetails.add({'uid': friendId, 'name': displayName});
+            if (friendData != null && friendData['email'] != null) {
+              friendEmails.add(friendData['email']);
             }
           }
         }
 
-        return friendDetails;
+        return friendEmails;
       }
     }
 
@@ -84,17 +86,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   List<Widget> _getPages() {
-    if (userId == null || username == null) {
+    if (userId == null || userEmail == null) {
       return [const Center(child: CircularProgressIndicator())];
     }
 
     return [
       ChoresScreen(
-        currentUser: username!,
-        friends: friends, 
-        onCountUpdated: (int count) {
-          _choreCountNotifier.value = count;
-        },
+        userEmail: userEmail!,
+        friendsEmails: friendsEmails,
+        // onCountUpdated: (int count) {
+        //   _choreCountNotifier.value = count;
+        // },
       ),
       EventsPage(),
       const FriendsPage(),

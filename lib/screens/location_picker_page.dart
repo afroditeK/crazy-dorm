@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geocoding/geocoding.dart';
 
 class LocationPage extends StatefulWidget {
-  final String location; // e.g. "Maribor, Slovenia" or any address
+  final String location; 
 
   const LocationPage({Key? key, required this.location}) : super(key: key);
 
@@ -49,9 +49,13 @@ class _LocationPageState extends State<LocationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Location: ${widget.location}'),
-        backgroundColor: Colors.deepPurple,
+       title: Text(
+      'Location: ${widget.location}',
+      style: TextStyle(
+        fontSize: 18.0, 
       ),
+    ),
+  ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

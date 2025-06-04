@@ -28,7 +28,6 @@ class _LoginPageState extends State<LoginPage> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
-      // On successful sign in, you might want to navigate somewhere
     } on FirebaseAuthException catch (e) {
       setState(() => errorMessage = e.message);
     } catch (_) {

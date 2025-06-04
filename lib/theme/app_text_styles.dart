@@ -23,4 +23,9 @@ class AppTextStyles {
     fontWeight: FontWeight.w600,
     color: Colors.white,
   );
+
+static const TextStyle bodyDark = TextStyle(color: Colors.white70, fontSize: 16);
+static const TextStyle headingDark = TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold);
+static const TextStyle labelDark = TextStyle(color: Colors.white70, fontSize: 14);
+
 }
