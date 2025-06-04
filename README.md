@@ -18,7 +18,9 @@ Theming & UI: Consistent colors, typography, and responsive design for better UX
    ```bash
    git clone https://github.com/afroditiK/crazy-dorm.git
 2. Checkout on brunch develop
-3. flutter pub get
-4. flutter run
+3.```bash
+   flutter pub get
+5. ```bash
+   flutter run
 
 
