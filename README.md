@@ -27,3 +27,7 @@ This is a Flutter mobile app, developed for the "Ubiquitous Applications Technol
    ```bash
    flutter pub get
    flutter run
+
+## API Keys
+
+The API keys shown here are fake and only for this school project.
